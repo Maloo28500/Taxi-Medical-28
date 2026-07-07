@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rentabilité Taxi Médical 28</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1769aa">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+body{font-family:Arial,sans-serif;background:#f3f6f8;margin:0;padding:14px;color:#17202a}
+.app{max-width:760px;margin:auto;background:#fff;padding:20px;border-radius:18px;box-shadow:0 6px 24px #0002}
+h1{font-size:23px;margin:0 0 6px}.sub{color:#5d6872;font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.full{grid-column:1/-1}
+label{display:block;font-weight:700;margin-top:12px}
+input,select{width:100%;box-sizing:border-box;padding:12px;margin-top:6px;border:1px solid #cbd3da;border-radius:10px;font-size:16px}
+.check{display:flex;align-items:flex-start;gap:10px;background:#f6f8fa;padding:11px;border-radius:10px;margin-top:12px}
+.check input{width:auto;margin-top:3px;transform:scale(1.25)}
+button{width:100%;padding:15px;margin-top:18px;border:0;border-radius:12px;background:#1769aa;color:#fff;font-size:18px;font-weight:800}
+.result{margin-top:18px;padding:16px;background:#eef7ff;border-radius:12px;line-height:1.55}
+.big{font-size:25px;font-weight:800}.good{color:#16733b}.bad{color:#b42318}
+hr{border:0;border-top:1px solid #ccd8e2;margin:12px 0}
+.note{font-size:13px;color:#59636e;margin-top:12px;background:#fff8df;padding:12px;border-radius:10px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>🚕 Rentabilité Taxi Médical 28</h1>
+<div class="sub">Version corrigée — le coût réel est calculé sur la distance totale aller + retour.</div>
+
+<div class="grid">
+<div>
+<label>Distance aller avec patient (km)</label>
+<input id="km" type="number" min="0" step="0.1" value="100">
+</div>
+
+<div>
+<label>Distance totale parcourue aller + retour (km)</label>
+<input id="totalAR" type="number" min="0" step="0.1" value="200">
+</div>
+
+<div>
+<label>Temps total de mission</label>
+<input id="temps" type="number" min="0" step="0.1" value="2">
+</div>
+
+<div>
+<label>Unité du temps</label>
+<select id="unite">
+<option value="h">Heures</option>
+<option value="min">Minutes</option>
+</select>
+</div>
+
+<div class="full">
+<label>Type de transport</label>
+<select id="typeTransport">
+<option value="consultation">Consultation — aucune majoration, même retour à vide</option>
+<option value="hospitalisation">Hospitalisation éligible avec aller ou retour à vide</option>
+</select>
+</div>
+
+<div class="full check">
+<input id="nuit" type="checkbox">
+<span><b>Nuit / week-end / jour férié</b><br><small>+50 % sur les composantes du tarif socle.</small></span>
+</div>
+
+<div class="full check">
+<input id="grande" type="checkbox">
+<span><b>Forfait Grande ville</b> +15 €</span>
+</div>
+
+<div>
+<label>Transport partagé</label>
+<select id="partage">
+<option value="1">1 patient — aucun abattement</option>
+<option value="2">2 patients — abattement 23 %</option>
+<option value="3">3 patients — abattement 35 %</option>
+<option value="4">4 patients ou plus — abattement 37 %</option>
+</select>
+</div>
+
+<div>
+<label>Patient seul ≥ 30 km lors d'un partagé</label>
+<select id="seul30">
+<option value="non">Non</option>
+<option value="oui">Oui — abattement 5 %</option>
+</select>
+</div>
+
+<div>
+<label>Supplément TPMR (€)</label>
+<input id="tpmr" type="number" min="0" step="0.01" value="0">
+</div>
+
+<div>
+<label>Péages facturables (€)</label>
+<input id="peage" type="number" min="0" step="0.01" value="0">
+</div>
+
+<div>
+<label>Coût réel véhicule par km (€)</label>
+<input id="coutkm" type="number" min="0" step="0.01" value="0.25">
+</div>
+
+<div>
+<label>Autres coûts directs (€)</label>
+<input id="autres" type="number" min="0" step="0.01" value="0">
+</div>
+</div>
+
+<button type="button" id="btnCalcul">Calculer la rentabilité</button>
+
+<div id="installBox" style="display:none;margin-top:14px;padding:12px;border-radius:12px;background:#e8f4ff;">
+<button type="button" id="installBtn" style="margin-top:0;background:#16733b;">Installer l’application sur le téléphone</button>
+</div>
+
+<div id="res" class="result"></div>
+
+<div class="note">
+<b>Règles intégrées :</b> 13 € pour les 4 premiers km, puis 1,19 €/km à partir du 5e km. 
+Hospitalisation uniquement : +25 % sur le tarif kilométrique si trajet en charge inférieur à 50 km, +50 % si supérieur ou égal à 50 km.
+L'attente CPAM = 0 €, elle doit être comptée dans le temps total.
+</div>
+
+<footer style="margin-top:24px;padding-top:14px;border-top:1px solid #d8dee4;text-align:center;color:#59636e;font-size:13px;">
+© Service Alliance Taxi — Propriété de Service Alliance Taxi
+</footer>
+</div>
+
+<script>
+function euro(nombre){
+  return nombre.toLocaleString('fr-FR', {style:'currency', currency:'EUR'});
+}
+
+function valeur(id){
+  var el = document.getElementById(id);
+  if(!el){ return 0; }
+  var n = parseFloat(String(el.value).replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function calculer(){
+  var km = valeur('km');
+  var totalAR = valeur('totalAR');
+  var temps = valeur('temps');
+  var unite = document.getElementById('unite').value;
+  var heures = unite === 'min' ? temps / 60 : temps;
+
+  var typeTransport = document.getElementById('typeTransport').value;
+  var hospitalisation = typeTransport === 'hospitalisation';
+  var nuit = document.getElementById('nuit').checked;
+  var grande = document.getElementById('grande').checked;
+
+  var partage = parseInt(document.getElementById('partage').value, 10);
+  var seul30 = document.getElementById('seul30').value === 'oui';
+
+  var tpmr = valeur('tpmr');
+  var peage = valeur('peage');
+  var coutkm = valeur('coutkm');
+  var autres = valeur('autres');
+
+  var forfait = km > 0 ? 13 : 0;
+  var kmTarifes = Math.max(0, km - 4);
+  var tarifKm = kmTarifes * 1.19;
+
+  var tauxHosp = 0;
+  if(hospitalisation && km > 0){
+    tauxHosp = km < 50 ? 0.25 : 0.50;
+  }
+  var majHosp = tarifKm * tauxHosp;
+
+  var forfaitGrande = grande ? 15 : 0;
+  var socleAvantNuit = forfait + tarifKm + majHosp + forfaitGrande;
+  var majNuit = nuit ? socleAvantNuit * 0.50 : 0;
+  var socleAvecMaj = socleAvantNuit + majNuit;
+
+  var tauxAbatt = 0;
+  if(partage === 2){ tauxAbatt = 0.23; }
+  if(partage === 3){ tauxAbatt = 0.35; }
+  if(partage >= 4){ tauxAbatt = 0.37; }
+  if(seul30){ tauxAbatt = 0.05; }
+
+  var abattement = socleAvecMaj * tauxAbatt;
+  var ca = socleAvecMaj - abattement + tpmr + peage;
+
+  var kmTotaux = totalAR > 0 ? totalAR : km;
+  var coutVehicule = kmTotaux * coutkm;
+  var couts = coutVehicule + autres;
+  var marge = ca - couts;
+  var margeH = heures > 0 ? marge / heures : 0;
+  var caH = heures > 0 ? ca / heures : 0;
+  var caKm = kmTotaux > 0 ? ca / kmTotaux : 0;
+
+  var classe = marge >= 0 ? 'good' : 'bad';
+
+  var html = '';
+  html += '<div><b>Type :</b> ' + (hospitalisation ? 'Hospitalisation éligible' : 'Consultation') + '</div>';
+  html += '<div><b>Forfait 4 premiers km :</b> ' + euro(forfait) + '</div>';
+  html += '<div><b>Km tarifés à partir du 5e :</b> ' + kmTarifes.toFixed(1) + ' km × 1,19 € = ' + euro(tarifKm) + '</div>';
+
+  if(hospitalisation){
+    html += '<div><b>Majoration hospitalisation :</b> ' + (tauxHosp*100).toFixed(0) + ' % = ' + euro(majHosp) + '</div>';
+  } else {
+    html += '<div><b>Majoration hospitalisation :</b> ' + euro(0) + ' — consultation</div>';
+  }
+
+  if(grande){ html += '<div><b>Forfait Grande ville :</b> ' + euro(forfaitGrande) + '</div>'; }
+  if(nuit){ html += '<div><b>Majoration nuit / week-end / férié :</b> ' + euro(majNuit) + '</div>'; }
+  if(tauxAbatt > 0){ html += '<div><b>Abattement :</b> -' + (tauxAbatt*100).toFixed(0) + ' % = -' + euro(abattement) + '</div>'; }
+  if(tpmr > 0){ html += '<div><b>Supplément TPMR :</b> ' + euro(tpmr) + '</div>'; }
+  if(peage > 0){ html += '<div><b>Péages facturables :</b> ' + euro(peage) + '</div>'; }
+
+  html += '<div><b>Attente facturée CPAM :</b> ' + euro(0) + '</div>';
+  html += '<hr>';
+  html += '<div><b>Chiffre d\'affaires estimé :</b> ' + euro(ca) + '</div>';
+  html += '<div><b>Distance aller avec patient :</b> ' + km.toFixed(1) + ' km</div>';
+  html += '<div><b>Distance totale aller + retour :</b> ' + kmTotaux.toFixed(1) + ' km</div>';
+  if(totalAR > 0 && totalAR < km){
+    html += '<div style="color:#b42318"><b>Attention :</b> la distance totale aller + retour est inférieure à la distance avec patient.</div>';
+  }
+  html += '<div><b>Coût réel pris en compte :</b> ' + kmTotaux.toFixed(1) + ' km × ' + euro(coutkm) + '/km = ' + euro(coutVehicule) + '</div>';
+  html += '<div><b>Coûts totaux :</b> ' + euro(couts) + '</div>';
+  html += '<div class="big ' + classe + '">Marge estimée : ' + euro(marge) + '</div>';
+  html += '<div><b>CA par heure :</b> ' + euro(caH) + '/h</div>';
+  html += '<div><b>Marge par heure :</b> ' + euro(margeH) + '/h</div>';
+  html += '<div><b>CA par km réellement roulé :</b> ' + euro(caKm) + '/km</div>';
+
+  document.getElementById('res').innerHTML = html;
+}
+
+document.getElementById('btnCalcul').addEventListener('click', calculer);
+calculer();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('./service-worker.js'); });
+}
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBox').style.display = 'block';
+});
+document.addEventListener('click', async function(e){
+  if(e.target && e.target.id === 'installBtn' && deferredPrompt){
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById('installBox').style.display = 'none';
+  }
+});
+</script>
+
+</body>
+</html>

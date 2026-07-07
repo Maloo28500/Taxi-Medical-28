@@ -1,0 +1,21 @@
+{
+  "name": "Rentabilité Taxi Médical 28",
+  "short_name": "Taxi Médical 28",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1769aa",
+  "description": "Calculateur de rentabilité taxi médical Eure-et-Loir — Service Alliance Taxi",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
